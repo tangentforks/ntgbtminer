@@ -13,15 +13,21 @@ import hashlib
 import struct
 import random
 import time
+import os, sys
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
-### Edit me! v
-RPC_URL     = "http://127.0.0.1:8332"
-RPC_USER    = "bitcoinrpc"
-RPC_PASS    = ""
-### Edit me! ^
+CFG_PATH='config.json'
+if os.path.exists(CFG_PATH):
+    CFG = json.loads(open(CFG_PATH).read())
+else:
+    print('config file not found')
+    sys.exit()
+
+RPC_URL     = CFG['RPC_URL']
+RPC_USER    = CFG['RPC_USER']
+RPC_PASS    = CFG['RPC_PASS']
 
 ################################################################################
 # Bitcoin Daemon JSON-HTTP RPC
@@ -399,5 +405,5 @@ def standalone_miner(coinbase_message, address):
             rpc_submitblock(submission)
 
 if __name__ == "__main__":
-    standalone_miner(bin2hex("Hello from vsergeev!"), "15PKyTs3jJ3Nyf3i6R7D9tfGCY1ZbtqWdv")
+    standalone_miner(bin2hex(CFG['BTC_MESSAGE']), CFG['BTC_ADDRESS'])
 

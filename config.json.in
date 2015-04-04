@@ -1,0 +1,5 @@
+{ "RPC_URL"     : "http://127.0.0.1:18332",
+  "RPC_USER"    : "bitcoinrpc",
+  "RPC_PASS"    : "put your password here",
+  "BTC_MESSAGE" : "put your message here and address below.",
+  "BTC_ADDRESS" : "1J8L8SogVewaJQBKmZKf5XB5RC24WV1KA3" }
