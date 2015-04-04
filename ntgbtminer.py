@@ -29,6 +29,11 @@ RPC_URL     = CFG['RPC_URL']
 RPC_USER    = CFG['RPC_USER']
 RPC_PASS    = CFG['RPC_PASS']
 
+def avg(xs):
+    return sum(xs)/len(xs) if xs else 0
+
+
+
 ################################################################################
 # Bitcoin Daemon JSON-HTTP RPC
 ################################################################################
@@ -52,7 +57,7 @@ def rpc(method, params=None):
         raise ValueError("rpc error: %s" % json.dumps(response['error']))
 
     return response['result']
-
+
 ################################################################################
 # Bitcoin Daemon RPC Call Wrappers
 ################################################################################
@@ -74,7 +79,7 @@ def rpc_getblock(block_id):
 def rpc_getrawtransaction(transaction_id):
     try: return rpc("getrawtransaction", [transaction_id])
     except ValueError: return {}
-
+
 ################################################################################
 # Representation Conversion Utility Functions
 ################################################################################
@@ -120,7 +125,7 @@ def bitcoinaddress2hash160(s):
     x = "%050x" % x
     # Discard 1-byte network byte at beginning and 4-byte checksum at the end
     return x[2:50-8]
-
+
 ################################################################################
 # Transaction Coinbase and Hashing Functions
 ################################################################################
@@ -167,7 +172,7 @@ def tx_make_coinbase(coinbase_script, address, value):
     tx += "00000000"
 
     return tx
-
+
 # Compute the SHA256 Double Hash of a transaction
 #
 # Arguments:
@@ -209,7 +214,7 @@ def tx_compute_merkle_root(tx_hashes):
 
     # Format the root in big endian ascii hex
     return bin2hex(tx_hashes[0][::-1])
-
+
 ################################################################################
 # Block Preparation Functions
 ################################################################################
@@ -237,7 +242,7 @@ def block_form_header(block):
     header += struct.pack("<L", block['nonce'])
 
     return header
-
+
 # Compute the Raw SHA256 Double Hash of a block header
 #
 # Arguments:
@@ -266,7 +271,7 @@ def block_bits2target(bits):
     target = "\x00"*(32-len(target)) + target
 
     return target
-
+
 # Check if a block header hash meets the target hash
 #
 # Arguments:
@@ -302,7 +307,7 @@ def block_make_submit(block):
         subm += tx['data']
 
     return subm
-
+
 ################################################################################
 # Mining Loop
 ################################################################################
@@ -340,7 +345,6 @@ def block_mine(block_template, coinbase_message, extranonce_start, address, time
     # Loop through the extranonce
     extranonce = extranonce_start
     while extranonce <= 0xffffffff:
-
         # Update the coinbase transaction with the extra nonce
         coinbase_script = coinbase_message + int2lehex(extranonce, 4)
         coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'])
@@ -359,15 +363,17 @@ def block_mine(block_template, coinbase_message, extranonce_start, address, time
         nonce = 0 if debugnonce_start == False else debugnonce_start
         while nonce <= 0xffffffff:
             # Update the block header with the new 32-bit nonce
-            block_header = block_header[0:76] + chr(nonce & 0xff) + chr((nonce >> 8) & 0xff) + chr((nonce >> 16) & 0xff) + chr((nonce >> 24) & 0xff)
+            block_header = block_header[0:76] + chr(nonce & 0xff) \
+                           + chr((nonce >> 8) & 0xff) + chr((nonce >> 16) & 0xff) \
+                           + chr((nonce >> 24) & 0xff)
             # Recompute the block hash
             block_hash = block_compute_raw_hash(block_header)
 
-            # Check if it the block meets the target target hash
+            # Check whether the block meets the target criteria
             if block_check_target(block_hash, target_hash):
                 block_template['nonce'] = nonce
                 block_template['hash'] = bin2hex(block_hash)
-                hps_average = 0 if len(hps_list) == 0 else sum(hps_list)/len(hps_list)
+                hps_average = avg(hps)
                 return (block_template, hps_average)
 
             # Lightweight benchmarking of hashes / sec and timeout check
@@ -378,7 +384,8 @@ def block_mine(block_template, coinbase_message, extranonce_start, address, time
 
                 # If our mine time expired, return none
                 if timeout != False and (time_stamp - time_start) > timeout:
-                    hps_average = 0 if len(hps_list) == 0 else sum(hps_list)/len(hps_list)
+                    hps_average = avg(hps_list)
+                    print "<timed out. extra: %d nonce: %d>" % (extranonce,nonce)
                     return (None, hps_average)
 
             nonce += 1
@@ -387,7 +394,7 @@ def block_mine(block_template, coinbase_message, extranonce_start, address, time
     # If we ran out of extra nonces, return none
     hps_average = 0 if len(hps_list) == 0 else sum(hps_list)/len(hps_list)
     return (None, hps_average)
-
+
 ################################################################################
 # Standalone Bitcoin Miner, Single-threaded
 ################################################################################
@@ -395,9 +402,9 @@ def block_mine(block_template, coinbase_message, extranonce_start, address, time
 def standalone_miner(coinbase_message, address):
     while True:
         print "Mining new block template..."
-        mined_block, hps = block_mine(rpc_getblocktemplate(), coinbase_message, 0, address, timeout=60)
+        mined_block, hps = block_mine(rpc_getblocktemplate(),
+                                      coinbase_message, 0, address, timeout=60)
         print "Average Mhash/s: %.4f\n" % (hps / 1000000.0)
-
         if mined_block != None:
             print "Solved a block! Block hash:", mined_block['hash']
             submission = block_make_submit(mined_block)
